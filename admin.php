@@ -17,10 +17,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     if ($_POST['action'] === 'update_academic_settings') {
         $academic_year = intval($_POST['academic_year'] ?? $current_settings['academic_year']);
         $semester = intval($_POST['semester'] ?? $current_settings['semester']);
+        $status = trim($_POST['survey_status'] ?? 'open');
         
         if ($academic_year > 0 && ($semester === 1 || $semester === 2)) {
-            if (set_academic_settings($academic_year, $semester)) {
-                $message = '學年度設定已更新：民國 ' . $academic_year . ' ' . get_semester_name($semester);
+            if (set_academic_settings($academic_year, $semester, $status)) {
+                $status_text = ($status === 'open') ? '開放' : '關閉';
+                $message = '學年度設定已更新：民國 ' . $academic_year . ' ' . get_semester_name($semester) . ' (' . $status_text . ')';
                 $message_type = 'success';
                 $current_settings = get_current_academic_settings();
             } else {
@@ -209,6 +211,30 @@ $all_questions = get_all_questions(); // For course question selection
                                     下學期
                                 </option>
                             </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">
+                                <strong>問卷填寫</strong> <span class="text-danger">*</span>
+                            </label>
+                            <div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="survey_status" id="survey_open"
+                                        value="open" <?php echo ($current_settings['status'] === 'open') ? 'checked' : ''; ?> required>
+                                    <label class="form-check-label" for="survey_open">
+                                        <i class="fas fa-unlock text-success"></i> <strong>開放</strong>
+                                        <small class="text-muted">(學生可填寫問卷)</small>
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="survey_status" id="survey_closed"
+                                        value="closed" <?php echo ($current_settings['status'] === 'closed') ? 'checked' : ''; ?> required>
+                                    <label class="form-check-label" for="survey_closed">
+                                        <i class="fas fa-lock text-danger"></i> <strong>關閉</strong>
+                                        <small class="text-muted">(隱藏問卷表單，只能查看統計)</small>
+                                    </label>
+                                </div>
+                            </div>
                         </div>
                     </div>
 

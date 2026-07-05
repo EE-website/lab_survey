@@ -79,7 +79,7 @@ CREATE TABLE IF NOT EXISTS system_settings (
     id INT AUTO_INCREMENT PRIMARY KEY,
     academic_year INT COMMENT 'Current Academic Year (ROC)',
     semester TINYINT COMMENT 'Current Semester (1=上學期, 2=下學期)',
-    status VARCHAR(50) DEFAULT 'active' COMMENT 'Setting Status',
+    status ENUM('open', 'closed') DEFAULT 'open' COMMENT 'Survey Status (open=開放, closed=關閉)',
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT 'Last Updated',
     updated_by VARCHAR(255) COMMENT 'Updated By',
     INDEX idx_academic_year (academic_year),

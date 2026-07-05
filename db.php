@@ -329,7 +329,7 @@ function western_to_roc($western_year) {
 function get_current_academic_settings() {
     global $conn;
     
-    $sql = "SELECT academic_year, semester FROM system_settings WHERE status = 1 LIMIT 1";
+    $sql = "SELECT academic_year, semester, status FROM system_settings LIMIT 1";
     $result = $conn->query($sql);
     
     if (!$result) {
@@ -340,7 +340,7 @@ function get_current_academic_settings() {
     
     // If no settings found, return defaults
     if (!$row) {
-        return ['academic_year' => 114, 'semester' => 1];
+        return ['academic_year' => 114, 'semester' => 1, 'status' => 'open'];
     }
     
     return $row;
@@ -349,24 +349,42 @@ function get_current_academic_settings() {
 /**
  * Update academic year and semester settings
  */
-function set_academic_settings($academic_year, $semester) {
+function set_academic_settings($academic_year, $semester, $status = 'open') {
     global $conn;
     
     $academic_year = intval($academic_year);
     $semester = intval($semester);
+    $status = trim($status);
     
     if ($semester < 1 || $semester > 2) {
         return false;
     }
     
-    $sql = "UPDATE system_settings SET academic_year = ?, semester = ? WHERE status = 1";
+    // Validate status
+    if (!in_array($status, ['open', 'closed'])) {
+        $status = 'open';
+    }
+    
+    // Check if record exists
+    $check_sql = "SELECT COUNT(*) as cnt FROM system_settings";
+    $result = $conn->query($check_sql);
+    $row = $result->fetch_assoc();
+    
+    if ($row['cnt'] > 0) {
+        // Update existing record
+        $sql = "UPDATE system_settings SET academic_year = ?, semester = ?, status = ? LIMIT 1";
+    } else {
+        // Insert new record
+        $sql = "INSERT INTO system_settings (academic_year, semester, status) VALUES (?, ?, ?)";
+    }
+    
     $stmt = $conn->prepare($sql);
     
     if (!$stmt) {
         die("Statement preparation failed: " . $conn->error);
     }
     
-    $stmt->bind_param("ii", $academic_year, $semester);
+    $stmt->bind_param("iis", $academic_year, $semester, $status);
     return $stmt->execute();
 }
 

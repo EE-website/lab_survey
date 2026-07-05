@@ -18,6 +18,9 @@ $semester = $settings['semester'];
 // Get available courses for this semester
 $available_courses = get_courses_by_year_semester($academic_year, $semester);
 
+// Check if survey is open
+$survey_is_open = ($settings['status'] === 'open');
+
 // Check if a course is selected
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['select_course'])) {
     $course_id = intval($_POST['course_id'] ?? 0);
@@ -35,40 +38,45 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['select_course'])) {
 
 // Process form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_survey'])) {
-    $respondent = trim($_POST['respondent_name'] ?? 'Anonymous');
-    $student_id = trim($_POST['student_id'] ?? '');
-    $course_id = intval($_POST['course_id_hidden'] ?? 0);
-    $responses = $_POST['responses'] ?? [];
-    
-    if ($course_id <= 0) {
-        $message = '請先選擇課程';
+    // Check if survey is still open
+    if (!$survey_is_open) {
+        $message = '問卷已關閉，無法提交回應';
         $message_type = 'danger';
     } else {
-        $saved_count = 0;
-        foreach ($responses as $question_id => $answer) {
-            // Convert to comma-separated string
-            if (is_array($answer)) {
-                if (empty($answer)) {
-                    continue;
+        $respondent = trim($_POST['respondent_name'] ?? 'Anonymous');
+        $student_id = trim($_POST['student_id'] ?? '');
+        $course_id = intval($_POST['course_id_hidden'] ?? 0);
+        $responses = $_POST['responses'] ?? [];
+        
+        if ($course_id <= 0) {
+            $message = '請先選擇課程';
+            $message_type = 'danger';
+        } else {
+            $saved_count = 0;
+            foreach ($responses as $question_id => $answer) {
+                // Convert to comma-separated string
+                if (is_array($answer)) {
+                    if (empty($answer)) {
+                        continue;
+                    }
+                    $answer = implode(', ', array_map('trim', $answer));
+                } else {
+                    $answer = trim($answer);
+                    if (empty($answer)) {
+                        continue;
+                    }
                 }
-                $answer = implode(', ', array_map('trim', $answer));
-            } else {
-                $answer = trim($answer);
-                if (empty($answer)) {
-                    continue;
-                }
-            }
-            
-            // Insert response
-            $question_id = intval($question_id);
-            $respondent_name = trim($respondent);
-            $student_id_clean = trim($student_id);
-            
-            $ip_address = $_SERVER['REMOTE_ADDR'] ?? '';
-            $user_agent = $_SERVER['HTTP_USER_AGENT'] ?? '';
-            
-            $sql = "INSERT INTO responses (question_id, course_id, academic_year, semester, answer, respondent, student_id, ip_address, user_agent) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
-            $stmt = $conn->prepare($sql);
+                
+                // Insert response
+                $question_id = intval($question_id);
+                $respondent_name = trim($respondent);
+                $student_id_clean = trim($student_id);
+                
+                $ip_address = $_SERVER['REMOTE_ADDR'] ?? '';
+                $user_agent = $_SERVER['HTTP_USER_AGENT'] ?? '';
+                
+                $sql = "INSERT INTO responses (question_id, course_id, academic_year, semester, answer, respondent, student_id, ip_address, user_agent) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                $stmt = $conn->prepare($sql);
                 
                 if ($stmt) {
                     $stmt->bind_param("iiiiissss", $question_id, $course_id, $academic_year, $semester, $answer, $respondent_name, $student_id_clean, $ip_address, $user_agent);
@@ -77,14 +85,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_survey'])) {
                     }
                 }
             }
-        
-        if ($saved_count > 0) {
-            $message = "感謝您的填寫！已收到 $saved_count 份回應。";
-            $message_type = 'success';
-            $selected_course = null;
-        } else {
-            $message = '請至少回答一個問題！';
-            $message_type = 'warning';
+            
+            if ($saved_count > 0) {
+                $message = "感謝您的填寫！已收到 $saved_count 份回應。";
+                $message_type = 'success';
+                $selected_course = null;
+            } else {
+                $message = '請至少回答一個問題！';
+                $message_type = 'warning';
+            }
         }
     }
 }
@@ -98,6 +107,15 @@ $questions = ($selected_course) ? get_questions_by_course($selected_course['id']
         <i class="fas fa-poll"></i> 填寫問卷
     </h1>
 
+    <?php if (!$survey_is_open): ?>
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <i class="fas fa-lock"></i> <strong>問卷已關閉</strong>
+        <br>
+        <small>民國 <?php echo $academic_year; ?> <?php echo get_semester_name($semester); ?> 的問卷填寫已結束，感謝您的參與！</small>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    <?php endif; ?>
+
     <?php if (!empty($message)): ?>
     <div class="alert alert-<?php echo $message_type; ?> alert-dismissible fade show" role="alert">
         <i class="fas fa-<?php echo $message_type === 'success' ? 'check-circle' : 'info-circle'; ?>"></i>
@@ -107,7 +125,7 @@ $questions = ($selected_course) ? get_questions_by_course($selected_course['id']
     <?php endif; ?>
 
     <!-- Course Selection Step -->
-    <?php if (!$selected_course || count($available_courses) === 0): ?>
+    <?php if ($survey_is_open && (!$selected_course || count($available_courses) === 0)): ?>
     <div class="card mb-4">
         <div class="card-header bg-primary text-white">
             <i class="fas fa-graduation-cap"></i> 第一步：選擇課程
@@ -264,9 +282,16 @@ $questions = ($selected_course) ? get_questions_by_course($selected_course['id']
 
         <!-- Submit Buttons -->
         <div class="d-grid gap-2 mb-3">
+            <?php if ($survey_is_open): ?>
             <button type="submit" name="submit_survey" class="btn btn-primary btn-lg">
                 <i class="fas fa-paper-plane"></i> 提交問卷
             </button>
+            <?php else: ?>
+            <button type="submit" name="submit_survey" class="btn btn-primary btn-lg" disabled>
+                <i class="fas fa-lock"></i> 問卷已關閉，無法提交
+            </button>
+            <small class="text-muted text-center">此學期問卷填寫已結束</small>
+            <?php endif; ?>
         </div>
     </form>
     <?php endif; ?>

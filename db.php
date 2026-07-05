@@ -227,6 +227,56 @@ function get_statistics() {
 }
 
 /**
+ * Get statistics filtered by course, academic year, and semester
+ */
+function get_statistics_filtered($selected_course = 0, $academic_year = null, $semester = null) {
+    global $conn;
+    
+    $stats = [];
+    
+    // Get current settings if not provided
+    if ($academic_year === null || $semester === null) {
+        $settings = get_current_academic_settings();
+        $academic_year = $academic_year ?? $settings['academic_year'];
+        $semester = $semester ?? $settings['semester'];
+    }
+    
+    $academic_year = intval($academic_year);
+    $semester = intval($semester);
+    $selected_course = intval($selected_course);
+    
+    // Total questions (based on selected course if specified)
+    if ($selected_course > 0) {
+        $result = $conn->query("SELECT COUNT(*) as count FROM course_questions WHERE course_id = $selected_course");
+    } else {
+        $result = $conn->query("SELECT COUNT(*) as count FROM questions WHERE is_active = 1");
+    }
+    
+    if ($result) {
+        $row = $result->fetch_assoc();
+        $stats['total_questions'] = $row['count'];
+    } else {
+        $stats['total_questions'] = 0;
+    }
+    
+    // Unique respondents (based on filters)
+    $query = "SELECT COUNT(DISTINCT respondent) as count FROM responses WHERE academic_year = $academic_year AND semester = $semester";
+    if ($selected_course > 0) {
+        $query .= " AND course_id = $selected_course";
+    }
+    
+    $result = $conn->query($query);
+    if ($result) {
+        $row = $result->fetch_assoc();
+        $stats['total_respondents'] = $row['count'];
+    } else {
+        $stats['total_respondents'] = 0;
+    }
+    
+    return $stats;
+}
+
+/**
  * Get responses for a question filtered by academic year and semester
  */
 function get_question_responses_by_year_semester($question_id, $academic_year = null, $semester = null) {

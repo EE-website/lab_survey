@@ -217,7 +217,7 @@ if ($selected_course > 0) {
                 <div class="card-body">
                     <div class="row text-center">
                         <?php
-                            $stats = get_statistics();
+                            $stats = get_statistics_filtered($selected_course, $selected_year, $selected_semester);
                         ?>
                         <div class="col-md-6">
                             <h3 class="text-primary"><?php echo $stats['total_questions']; ?></h3>

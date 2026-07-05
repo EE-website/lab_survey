@@ -74,9 +74,74 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $message_type = 'success';
         }
     }
+    
+    // Process new course addition
+    if ($_POST['action'] === 'add_course') {
+        $course_code = trim($_POST['course_code'] ?? '');
+        $course_name = trim($_POST['course_name'] ?? '');
+        $instructor_name = trim($_POST['instructor_name'] ?? '');
+        $description = trim($_POST['course_description'] ?? '');
+        $question_ids = $_POST['course_questions'] ?? [];
+        
+        if (!empty($course_code) && !empty($course_name) && !empty($instructor_name)) {
+            $new_course_id = add_course($course_code, $course_name, $instructor_name, $description, 
+                      $current_settings['semester'], $current_settings['academic_year']);
+            
+            // Associate questions with the course
+            if (!empty($question_ids)) {
+                $question_ids_clean = array_map('intval', $question_ids);
+                add_course_questions($new_course_id, $question_ids_clean);
+            }
+            
+            $message = '新增課程成功' . (count($question_ids) > 0 ? '，已關聯 ' . count($question_ids) . ' 個問題' : '，但未選擇任何問題');
+            $message_type = 'success';
+        } else {
+            $message = '請填寫所有必填欄位';
+            $message_type = 'warning';
+        }
+    }
+    
+    // Process course update
+    if ($_POST['action'] === 'update_course') {
+        $course_id = intval($_POST['course_id'] ?? 0);
+        $course_code = trim($_POST['course_code'] ?? '');
+        $course_name = trim($_POST['course_name'] ?? '');
+        $instructor_name = trim($_POST['instructor_name'] ?? '');
+        $description = trim($_POST['course_description'] ?? '');
+        $question_ids = $_POST['course_questions'] ?? [];
+        
+        if ($course_id > 0 && !empty($course_code) && !empty($course_name) && !empty($instructor_name)) {
+            update_course($course_id, $course_code, $course_name, $instructor_name, $description);
+            
+            // Update associated questions (remove all and re-add)
+            remove_all_course_questions($course_id);
+            if (!empty($question_ids)) {
+                $question_ids_clean = array_map('intval', $question_ids);
+                add_course_questions($course_id, $question_ids_clean);
+            }
+            
+            $message = '更新課程成功' . (count($question_ids) > 0 ? '，已關聯 ' . count($question_ids) . ' 個問題' : '，未關聯任何問題');
+            $message_type = 'success';
+        } else {
+            $message = '請填寫所有必填欄位';
+            $message_type = 'warning';
+        }
+    }
+    
+    // Process course deletion
+    if ($_POST['action'] === 'delete_course') {
+        $course_id = intval($_POST['course_id'] ?? 0);
+        if ($course_id > 0) {
+            delete_course($course_id);
+            $message = '刪除課程成功';
+            $message_type = 'success';
+        }
+    }
 }
 
 $questions = get_all_questions();
+$courses = get_courses_by_year_semester($current_settings['academic_year'], $current_settings['semester']);
+$all_questions = get_all_questions(); // For course question selection
 ?>
 
 <div class="container container-main">
@@ -151,6 +216,222 @@ $questions = get_all_questions();
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
                         <button type="submit" class="btn btn-primary">
                             <i class="fas fa-save"></i> 保存設定
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Add Course Form -->
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <i class="fas fa-book"></i> 新增課程
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="">
+                        <input type="hidden" name="action" value="add_course">
+
+                        <div class="mb-3">
+                            <label for="course_code" class="form-label">
+                                <strong>科號</strong> <span class="text-danger">*</span>
+                            </label>
+                            <input type="text" class="form-control" id="course_code" name="course_code"
+                                placeholder="例如：EE101" maxlength="50" required>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="course_name_add" class="form-label">
+                                <strong>課程名稱</strong> <span class="text-danger">*</span>
+                            </label>
+                            <input type="text" class="form-control" id="course_name_add" name="course_name"
+                                placeholder="例如：數位邏輯實驗" maxlength="255" required>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="instructor_name_add" class="form-label">
+                                <strong>教師名稱</strong> <span class="text-danger">*</span>
+                            </label>
+                            <input type="text" class="form-control" id="instructor_name_add" name="instructor_name"
+                                placeholder="例如：王老師" maxlength="255" required>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="course_description_add" class="form-label">
+                                <strong>課程描述</strong>
+                            </label>
+                            <textarea class="form-control" id="course_description_add" name="course_description"
+                                rows="2" placeholder="額外說明" maxlength="500"></textarea>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <label for="course_questions_add" class="form-label mb-0">
+                                    <strong>選擇問題</strong>
+                                    <small class="text-muted">(可複選，可不選)</small>
+                                </label>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="toggleSelectAll('add')">全選</button>
+                            </div>
+                            <div class="border rounded p-3" style="max-height: 200px; overflow-y: auto; background-color: #f8f9fa;" id="add-questions-container">
+                                <?php if (count($all_questions) > 0): ?>
+                                <?php foreach ($all_questions as $q): ?>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="course_questions[]" 
+                                        id="cq_add_<?php echo $q['id']; ?>" value="<?php echo $q['id']; ?>">
+                                    <label class="form-check-label" for="cq_add_<?php echo $q['id']; ?>">
+                                        <small><?php echo htmlspecialchars($q['title']); ?></small>
+                                    </label>
+                                </div>
+                                <?php endforeach; ?>
+                                <?php else: ?>
+                                <div class="alert alert-info mb-0" role="alert">
+                                    <small><i class="fas fa-info-circle"></i> 尚無問題可選擇</small>
+                                </div>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary w-100">
+                            <i class="fas fa-plus"></i> 新增課程
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Existing Courses List -->
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <i class="fas fa-book-open"></i> 課程列表 (<?php echo count($courses); ?>)
+                    <small class="text-muted">民國 <?php echo $current_settings['academic_year']; ?> 
+                    <?php echo get_semester_name($current_settings['semester']); ?></small>
+                </div>
+                <div class="card-body" style="max-height: 600px; overflow-y: auto;">
+                    <?php if (count($courses) > 0): ?>
+                    <?php foreach ($courses as $course): ?>
+                    <div class="card mb-2 border-left border-success" style="border-left-width: 4px;">
+                        <div class="card-body p-2">
+                            <h6 class="card-title mb-1">
+                                <strong><?php echo htmlspecialchars($course['course_code']); ?></strong> - 
+                                <?php echo htmlspecialchars($course['course_name']); ?>
+                            </h6>
+                            <small class="text-muted d-block">
+                                <strong>教師：</strong> <?php echo htmlspecialchars($course['instructor_name']); ?>
+                            </small>
+                            <?php if (!empty($course['description'])): ?>
+                            <small class="text-muted d-block">
+                                <strong>說明：</strong> <?php echo htmlspecialchars($course['description']); ?>
+                            </small>
+                            <?php endif; ?>
+                            <div class="mt-2 d-flex gap-2">
+                                <button type="button" class="btn btn-sm btn-warning" data-bs-toggle="modal"
+                                    data-bs-target="#editCourseModal" onclick="editCourse(<?php echo $course['id']; ?>, '<?php echo htmlspecialchars($course['course_code'], ENT_QUOTES); ?>', '<?php echo htmlspecialchars($course['course_name'], ENT_QUOTES); ?>', '<?php echo htmlspecialchars($course['instructor_name'], ENT_QUOTES); ?>', '<?php echo htmlspecialchars($course['description'] ?? '', ENT_QUOTES); ?>')">
+                                    <i class="fas fa-edit"></i> 編輯
+                                </button>
+                                <form method="POST" action="" style="display: inline;"
+                                    onsubmit="return confirm('確認刪除此課程？');">
+                                    <input type="hidden" name="action" value="delete_course">
+                                    <input type="hidden" name="course_id" value="<?php echo $course['id']; ?>">
+                                    <button type="submit" class="btn btn-sm btn-danger">
+                                        <i class="fas fa-trash"></i> 刪除
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    <?php endforeach; ?>
+                    <?php else: ?>
+                    <div class="alert alert-info mb-0">
+                        <i class="fas fa-info-circle"></i> 此學期尚無課程
+                    </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Course Modal -->
+    <div class="modal fade" id="editCourseModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-edit"></i> 編輯課程
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="POST" action="">
+                    <input type="hidden" name="action" value="update_course">
+                    <input type="hidden" id="edit_course_id" name="course_id" value="">
+
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label for="edit_course_code" class="form-label">
+                                <strong>科號</strong> <span class="text-danger">*</span>
+                            </label>
+                            <input type="text" class="form-control" id="edit_course_code" name="course_code"
+                                maxlength="50" required>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="edit_course_name" class="form-label">
+                                <strong>課程名稱</strong> <span class="text-danger">*</span>
+                            </label>
+                            <input type="text" class="form-control" id="edit_course_name" name="course_name"
+                                maxlength="255" required>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="edit_instructor_name" class="form-label">
+                                <strong>教師名稱</strong> <span class="text-danger">*</span>
+                            </label>
+                            <input type="text" class="form-control" id="edit_instructor_name" name="instructor_name"
+                                maxlength="255" required>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="edit_course_description" class="form-label">
+                                <strong>課程描述</strong>
+                            </label>
+                            <textarea class="form-control" id="edit_course_description" name="course_description"
+                                rows="2" maxlength="500"></textarea>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <label for="edit_course_questions" class="form-label mb-0">
+                                    <strong>選擇問題</strong>
+                                    <small class="text-muted">(可複選，可不選)</small>
+                                </label>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="toggleSelectAll('edit')">全選</button>
+                            </div>
+                            <div class="border rounded p-3" style="max-height: 200px; overflow-y: auto; background-color: #f8f9fa;" id="edit-questions-container">
+                                <?php if (count($all_questions) > 0): ?>
+                                <?php foreach ($all_questions as $q): ?>
+                                <div class="form-check">
+                                    <input class="form-check-input edit-course-question" type="checkbox" name="course_questions[]" 
+                                        id="cq_edit_<?php echo $q['id']; ?>" value="<?php echo $q['id']; ?>">
+                                    <label class="form-check-label" for="cq_edit_<?php echo $q['id']; ?>">
+                                        <small><?php echo htmlspecialchars($q['title']); ?></small>
+                                    </label>
+                                </div>
+                                <?php endforeach; ?>
+                                <?php else: ?>
+                                <div class="alert alert-info mb-0" role="alert">
+                                    <small><i class="fas fa-info-circle"></i> 尚無問題可選擇</small>
+                                </div>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> 保存修改
                         </button>
                     </div>
                 </form>
@@ -308,6 +589,49 @@ function toggleOptionsInput() {
     } else if (type === 'multiple_choice' && optionsTextarea.value.trim() === '') {
         optionsTextarea.value = '';
     }
+}
+
+// Toggle select all for questions
+function toggleSelectAll(form) {
+    const container = form === 'add' ? 'add-questions-container' : 'edit-questions-container';
+    const checkboxClass = form === 'add' ? 'form-check-input' : 'edit-course-question';
+    const checkboxes = document.querySelectorAll('#' + container + ' .' + checkboxClass);
+    
+    // Check if all are already selected
+    const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+    
+    // Toggle: if all checked, uncheck all; otherwise check all
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = !allChecked;
+    });
+}
+
+// Handle course edit modal
+function editCourse(id, courseCode, courseName, instructorName, description) {
+    document.getElementById('edit_course_id').value = id;
+    document.getElementById('edit_course_code').value = courseCode;
+    document.getElementById('edit_course_name').value = courseName;
+    document.getElementById('edit_instructor_name').value = instructorName;
+    document.getElementById('edit_course_description').value = description;
+    
+    // Clear all question checkboxes first
+    document.querySelectorAll('.edit-course-question').forEach(checkbox => {
+        checkbox.checked = false;
+    });
+    
+    // Load course's questions via AJAX
+    fetch('get_course_questions.php?course_id=' + id)
+        .then(response => response.json())
+        .then(data => {
+            // Check the questions that belong to this course
+            data.question_ids.forEach(qid => {
+                const checkbox = document.getElementById('cq_edit_' + qid);
+                if (checkbox) {
+                    checkbox.checked = true;
+                }
+            });
+        })
+        .catch(error => console.log('Could not load course questions:', error));
 }
 
 function loadTemplate(templateName) {

@@ -413,4 +413,318 @@ function calculate_question_statistics($question_id, $responses, $question_type 
     return $stats;
 }
 
+/**
+ * Get all courses
+ */
+function get_all_courses() {
+    global $conn;
+    
+    $sql = "SELECT id, course_code, course_name, instructor_name, description, semester, academic_year, is_active, created_at FROM courses WHERE is_active = 1 ORDER BY academic_year DESC, semester DESC, course_code ASC";
+    $result = $conn->query($sql);
+    
+    if (!$result) {
+        die("Query failed: " . $conn->error);
+    }
+    
+    $courses = [];
+    while ($row = $result->fetch_assoc()) {
+        $courses[] = $row;
+    }
+    
+    return $courses;
+}
+
+/**
+ * Get a single course by ID
+ */
+function get_course($id) {
+    global $conn;
+    
+    $id = intval($id);
+    $sql = "SELECT id, course_code, course_name, instructor_name, description, semester, academic_year, is_active, created_at FROM courses WHERE id = ? AND is_active = 1";
+    $stmt = $conn->prepare($sql);
+    
+    if (!$stmt) {
+        die("Statement preparation failed: " . $conn->error);
+    }
+    
+    $stmt->bind_param("i", $id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $row = $result->fetch_assoc();
+    
+    return $row ? $row : null;
+}
+
+/**
+ * Add a new course
+ */
+function add_course($course_code, $course_name, $instructor_name, $description = '', $semester = null, $academic_year = null) {
+    global $conn;
+    
+    $course_code = trim($course_code);
+    $course_name = trim($course_name);
+    $instructor_name = trim($instructor_name);
+    $description = trim($description);
+    
+    // Use current semester and academic year if not provided
+    if ($semester === null || $academic_year === null) {
+        $settings = get_current_academic_settings();
+        $semester = $semester ?? $settings['semester'];
+        $academic_year = $academic_year ?? $settings['academic_year'];
+    }
+    
+    $semester = intval($semester);
+    $academic_year = intval($academic_year);
+    
+    $sql = "INSERT INTO courses (course_code, course_name, instructor_name, description, semester, academic_year) VALUES (?, ?, ?, ?, ?, ?)";
+    $stmt = $conn->prepare($sql);
+    
+    if (!$stmt) {
+        die("Statement preparation failed: " . $conn->error);
+    }
+    
+    $stmt->bind_param("ssssii", $course_code, $course_name, $instructor_name, $description, $semester, $academic_year);
+    
+    if ($stmt->execute()) {
+        return $conn->insert_id;
+    } else {
+        die("Insert failed: " . $conn->error);
+    }
+}
+
+/**
+ * Update a course
+ */
+function update_course($id, $course_code, $course_name, $instructor_name, $description = '', $semester = null, $academic_year = null) {
+    global $conn;
+    
+    $id = intval($id);
+    $course_code = trim($course_code);
+    $course_name = trim($course_name);
+    $instructor_name = trim($instructor_name);
+    $description = trim($description);
+    
+    // Use current values if not provided
+    if ($semester === null || $academic_year === null) {
+        $course = get_course($id);
+        $semester = $semester ?? $course['semester'];
+        $academic_year = $academic_year ?? $course['academic_year'];
+    }
+    
+    $semester = intval($semester);
+    $academic_year = intval($academic_year);
+    
+    $sql = "UPDATE courses SET course_code = ?, course_name = ?, instructor_name = ?, description = ?, semester = ?, academic_year = ? WHERE id = ?";
+    $stmt = $conn->prepare($sql);
+    
+    if (!$stmt) {
+        die("Statement preparation failed: " . $conn->error);
+    }
+    
+    $stmt->bind_param("ssssiii", $course_code, $course_name, $instructor_name, $description, $semester, $academic_year, $id);
+    return $stmt->execute();
+}
+
+/**
+ * Delete a course (soft delete)
+ */
+function delete_course($id) {
+    global $conn;
+    
+    $id = intval($id);
+    
+    // Soft delete: Mark as inactive
+    $sql = "UPDATE courses SET is_active = 0 WHERE id = ?";
+    $stmt = $conn->prepare($sql);
+    
+    if (!$stmt) {
+        die("Statement preparation failed: " . $conn->error);
+    }
+    
+    $stmt->bind_param("i", $id);
+    return $stmt->execute();
+}
+
+/**
+ * Get questions for a specific course (via course_questions junction table)
+ */
+function get_questions_by_course($course_id) {
+    global $conn;
+    
+    $course_id = intval($course_id);
+    $sql = "SELECT q.id, q.title, q.type, q.allow_multiple, q.is_required, q.description, q.options, q.created_at 
+            FROM questions q
+            INNER JOIN course_questions cq ON q.id = cq.question_id
+            WHERE cq.course_id = ? AND q.is_active = 1 
+            ORDER BY q.id ASC";
+    $stmt = $conn->prepare($sql);
+    
+    if (!$stmt) {
+        die("Statement preparation failed: " . $conn->error);
+    }
+    
+    $stmt->bind_param("i", $course_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    $questions = [];
+    while ($row = $result->fetch_assoc()) {
+        $row['options'] = json_decode($row['options'], true);
+        $questions[] = $row;
+    }
+    
+    return $questions;
+}
+
+/**
+ * Get courses by academic year and semester
+ */
+function get_courses_by_year_semester($academic_year = null, $semester = null) {
+    global $conn;
+    
+    // Get current settings if not provided
+    if ($academic_year === null || $semester === null) {
+        $settings = get_current_academic_settings();
+        $academic_year = $academic_year ?? $settings['academic_year'];
+        $semester = $semester ?? $settings['semester'];
+    }
+    
+    $academic_year = intval($academic_year);
+    $semester = intval($semester);
+    
+    $sql = "SELECT id, course_code, course_name, instructor_name, description, semester, academic_year, is_active, created_at FROM courses WHERE academic_year = ? AND semester = ? AND is_active = 1 ORDER BY course_code ASC";
+    $stmt = $conn->prepare($sql);
+    
+    if (!$stmt) {
+        die("Statement preparation failed: " . $conn->error);
+    }
+    
+    $stmt->bind_param("ii", $academic_year, $semester);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    $courses = [];
+    while ($row = $result->fetch_assoc()) {
+        $courses[] = $row;
+    }
+    
+    return $courses;
+}
+
+/**
+ * Add a question to a course (create association in course_questions)
+ */
+function add_course_question($course_id, $question_id) {
+    global $conn;
+    
+    $course_id = intval($course_id);
+    $question_id = intval($question_id);
+    
+    $sql = "INSERT INTO course_questions (course_id, question_id) VALUES (?, ?)";
+    $stmt = $conn->prepare($sql);
+    
+    if (!$stmt) {
+        die("Statement preparation failed: " . $conn->error);
+    }
+    
+    $stmt->bind_param("ii", $course_id, $question_id);
+    return $stmt->execute();
+}
+
+/**
+ * Add multiple questions to a course
+ */
+function add_course_questions($course_id, $question_ids = []) {
+    global $conn;
+    
+    if (empty($question_ids)) {
+        return true; // No questions to add
+    }
+    
+    $course_id = intval($course_id);
+    $success_count = 0;
+    
+    foreach ($question_ids as $question_id) {
+        $question_id = intval($question_id);
+        $sql = "INSERT INTO course_questions (course_id, question_id) VALUES (?, ?) 
+                ON DUPLICATE KEY UPDATE course_id = course_id";
+        $stmt = $conn->prepare($sql);
+        
+        if ($stmt) {
+            $stmt->bind_param("ii", $course_id, $question_id);
+            if ($stmt->execute()) {
+                $success_count++;
+            }
+        }
+    }
+    
+    return $success_count > 0;
+}
+
+/**
+ * Remove a question from a course
+ */
+function remove_course_question($course_id, $question_id) {
+    global $conn;
+    
+    $course_id = intval($course_id);
+    $question_id = intval($question_id);
+    
+    $sql = "DELETE FROM course_questions WHERE course_id = ? AND question_id = ?";
+    $stmt = $conn->prepare($sql);
+    
+    if (!$stmt) {
+        die("Statement preparation failed: " . $conn->error);
+    }
+    
+    $stmt->bind_param("ii", $course_id, $question_id);
+    return $stmt->execute();
+}
+
+/**
+ * Remove all questions from a course
+ */
+function remove_all_course_questions($course_id) {
+    global $conn;
+    
+    $course_id = intval($course_id);
+    
+    $sql = "DELETE FROM course_questions WHERE course_id = ?";
+    $stmt = $conn->prepare($sql);
+    
+    if (!$stmt) {
+        die("Statement preparation failed: " . $conn->error);
+    }
+    
+    $stmt->bind_param("i", $course_id);
+    return $stmt->execute();
+}
+
+/**
+ * Get all question IDs for a course
+ */
+function get_course_question_ids($course_id) {
+    global $conn;
+    
+    $course_id = intval($course_id);
+    $sql = "SELECT question_id FROM course_questions WHERE course_id = ? ORDER BY question_id ASC";
+    $stmt = $conn->prepare($sql);
+    
+    if (!$stmt) {
+        die("Statement preparation failed: " . $conn->error);
+    }
+    
+    $stmt->bind_param("i", $course_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    $question_ids = [];
+    while ($row = $result->fetch_assoc()) {
+        $question_ids[] = $row['question_id'];
+    }
+    
+    return $question_ids;
+}
+
 ?>

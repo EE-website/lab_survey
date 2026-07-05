@@ -8,62 +8,89 @@ include 'header.php';
 
 $message = '';
 $message_type = '';
+$selected_course = null;
+
+// Get current academic settings
+$settings = get_current_academic_settings();
+$academic_year = $settings['academic_year'];
+$semester = $settings['semester'];
+
+// Get available courses for this semester
+$available_courses = get_courses_by_year_semester($academic_year, $semester);
+
+// Check if a course is selected
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['select_course'])) {
+    $course_id = intval($_POST['course_id'] ?? 0);
+    if ($course_id > 0) {
+        $selected_course = get_course($course_id);
+        if (!$selected_course) {
+            $message = '所選課程不存在';
+            $message_type = 'danger';
+        }
+    } else {
+        $message = '請選擇一門課程';
+        $message_type = 'warning';
+    }
+}
 
 // Process form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_survey'])) {
     $respondent = trim($_POST['respondent_name'] ?? 'Anonymous');
     $student_id = trim($_POST['student_id'] ?? '');
+    $course_id = intval($_POST['course_id_hidden'] ?? 0);
     $responses = $_POST['responses'] ?? [];
     
-    // Get current academic year and semester
-    $settings = get_current_academic_settings();
-    $academic_year = $settings['academic_year'];
-    $semester = $settings['semester'];
-    
-    $saved_count = 0;
-    foreach ($responses as $question_id => $answer) {
-        // Convert to comma-separated string
-        if (is_array($answer)) {
-            if (empty($answer)) {
-                continue;
-            }
-            $answer = implode(', ', array_map('trim', $answer));
-        } else {
-            $answer = trim($answer);
-            if (empty($answer)) {
-                continue;
-            }
-        }
-        
-        // Insert response
-        $question_id = intval($question_id);
-        $respondent_name = trim($respondent);
-        $student_id_clean = trim($student_id);
-        
-        $ip_address = $_SERVER['REMOTE_ADDR'] ?? '';
-        $user_agent = $_SERVER['HTTP_USER_AGENT'] ?? '';
-        
-        $sql = "INSERT INTO responses (question_id, academic_year, semester, answer, respondent, student_id, ip_address, user_agent) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
-        $stmt = $conn->prepare($sql);
-            
-            if ($stmt) {
-                $stmt->bind_param("iiisssss", $question_id, $academic_year, $semester, $answer, $respondent_name, $student_id_clean, $ip_address, $user_agent);
-                if ($stmt->execute()) {
-                    $saved_count++;
+    if ($course_id <= 0) {
+        $message = '請先選擇課程';
+        $message_type = 'danger';
+    } else {
+        $saved_count = 0;
+        foreach ($responses as $question_id => $answer) {
+            // Convert to comma-separated string
+            if (is_array($answer)) {
+                if (empty($answer)) {
+                    continue;
+                }
+                $answer = implode(', ', array_map('trim', $answer));
+            } else {
+                $answer = trim($answer);
+                if (empty($answer)) {
+                    continue;
                 }
             }
+            
+            // Insert response
+            $question_id = intval($question_id);
+            $respondent_name = trim($respondent);
+            $student_id_clean = trim($student_id);
+            
+            $ip_address = $_SERVER['REMOTE_ADDR'] ?? '';
+            $user_agent = $_SERVER['HTTP_USER_AGENT'] ?? '';
+            
+            $sql = "INSERT INTO responses (question_id, course_id, academic_year, semester, answer, respondent, student_id, ip_address, user_agent) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            $stmt = $conn->prepare($sql);
+                
+                if ($stmt) {
+                    $stmt->bind_param("iiiiissss", $question_id, $course_id, $academic_year, $semester, $answer, $respondent_name, $student_id_clean, $ip_address, $user_agent);
+                    if ($stmt->execute()) {
+                        $saved_count++;
+                    }
+                }
+            }
+        
+        if ($saved_count > 0) {
+            $message = "感謝您的填寫！已收到 $saved_count 份回應。";
+            $message_type = 'success';
+            $selected_course = null;
+        } else {
+            $message = '請至少回答一個問題！';
+            $message_type = 'warning';
         }
-    
-    if ($saved_count > 0) {
-        $message = "感謝您的填寫！已收到 $saved_count 份回應。";
-        $message_type = 'success';
-    } else {
-        $message = '請至少回答一個問題！';
-        $message_type = 'warning';
     }
 }
 
-$questions = get_all_questions();
+// Get questions for selected course, or all questions if no course selected
+$questions = ($selected_course) ? get_questions_by_course($selected_course['id']) : [];
 ?>
 
 <div class="container container-main">
@@ -79,12 +106,71 @@ $questions = get_all_questions();
     </div>
     <?php endif; ?>
 
+    <!-- Course Selection Step -->
+    <?php if (!$selected_course || count($available_courses) === 0): ?>
+    <div class="card mb-4">
+        <div class="card-header bg-primary text-white">
+            <i class="fas fa-graduation-cap"></i> 第一步：選擇課程
+        </div>
+        <div class="card-body">
+            <?php if (count($available_courses) === 0): ?>
+            <div class="alert alert-warning" role="alert">
+                <i class="fas fa-exclamation-triangle"></i> 民國 <?php echo $academic_year; ?>
+                <?php echo get_semester_name($semester); ?> 目前沒有可評量的課程
+            </div>
+            <?php else: ?>
+            <p class="text-muted mb-3">民國 <?php echo $academic_year; ?>
+                <?php echo get_semester_name($semester); ?> - 請選擇一門課程進行評量</p>
+            <form method="POST" action="">
+                <div class="mb-3">
+                    <label for="course_id" class="form-label">
+                        <strong>選擇課程</strong> <span class="text-danger">*</span>
+                    </label>
+                    <select class="form-select" id="course_id" name="course_id" required>
+                        <option value="">-- 請選擇課程 --</option>
+                        <?php foreach ($available_courses as $course): ?>
+                        <option value="<?php echo $course['id']; ?>">
+                            [<?php echo htmlspecialchars($course['course_code']); ?>]
+                            <?php echo htmlspecialchars($course['course_name']); ?> -
+                            <?php echo htmlspecialchars($course['instructor_name']); ?>
+                        </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <button type="submit" name="select_course" class="btn btn-primary">
+                    <i class="fas fa-arrow-right"></i> 開始評量
+                </button>
+            </form>
+            <?php endif; ?>
+        </div>
+    </div>
+    <?php endif; ?>
+
+    <!-- Survey Questions Form -->
+    <?php if ($selected_course): ?>
     <?php if (count($questions) === 0): ?>
     <div class="alert alert-warning" role="alert">
-        <i class="fas fa-exclamation-triangle"></i> 目前沒有可填寫的問卷
+        <i class="fas fa-exclamation-triangle"></i> 此課程目前沒有評量問題
+        <form method="POST" action="" style="display: inline;">
+            <button type="submit" class="btn btn-sm btn-link">返回課程選擇</button>
+        </form>
     </div>
     <?php else: ?>
+    <div class="alert alert-info mb-3">
+        <i class="fas fa-info-circle"></i>
+        <strong>課程：</strong> [<?php echo htmlspecialchars($selected_course['course_code']); ?>]
+        <?php echo htmlspecialchars($selected_course['course_name']); ?> -
+        <?php echo htmlspecialchars($selected_course['instructor_name']); ?>
+        <form method="POST" action="" style="display: inline; float: right;">
+            <button type="submit" class="btn btn-sm btn-secondary">
+                <i class="fas fa-arrow-left"></i> 返回課程選擇
+            </button>
+        </form>
+    </div>
+
     <form method="POST" action="" class="needs-validation" novalidate>
+        <input type="hidden" name="course_id_hidden" value="<?php echo $selected_course['id']; ?>">
+
         <!-- Respondent Information -->
         <div class="card mb-3">
             <div class="card-header bg-info text-white">
@@ -183,6 +269,7 @@ $questions = get_all_questions();
             </button>
         </div>
     </form>
+    <?php endif; ?>
     <?php endif; ?>
 </div>
 

@@ -41,14 +41,17 @@ if (empty($available_combinations)) {
                     <form method="GET" class="d-flex gap-2">
                         <select class="form-select" id="academic_year_filter" name="year" onchange="this.form.submit()">
                             <?php foreach ($available_combinations as $combo): ?>
-                            <option value="<?php echo $combo['academic_year']; ?>" 
+                            <option value="<?php echo $combo['academic_year']; ?>"
                                 data-semester="<?php echo $combo['semester']; ?>"
                                 <?php echo ($selected_year === intval($combo['academic_year']) && $selected_semester === intval($combo['semester'])) ? 'selected' : ''; ?>>
-                                民國 <?php echo $combo['academic_year']; ?> <?php echo get_semester_name($combo['semester']); ?> (西元 <?php echo roc_to_western($combo['academic_year']); ?>)
+                                民國 <?php echo $combo['academic_year']; ?>
+                                <?php echo get_semester_name($combo['semester']); ?> (西元
+                                <?php echo roc_to_western($combo['academic_year']); ?>)
                             </option>
                             <?php endforeach; ?>
                         </select>
-                        <input type="hidden" name="semester" id="semester_input" value="<?php echo $selected_semester; ?>">
+                        <input type="hidden" name="semester" id="semester_input"
+                            value="<?php echo $selected_semester; ?>">
                     </form>
                 </div>
             </div>
@@ -57,7 +60,8 @@ if (empty($available_combinations)) {
 
     <div class="alert alert-info" role="alert">
         <i class="fas fa-info-circle"></i>
-        <strong>注意：</strong> 以下是民國 <?php echo $selected_year; ?> <?php echo get_semester_name($selected_semester); ?> 的問卷回應統計結果。
+        <strong>注意：</strong> 以下是民國 <?php echo $selected_year; ?> <?php echo get_semester_name($selected_semester); ?>
+        的問卷回應統計結果。
     </div>
 
     <?php if (count($questions) === 0): ?>
@@ -143,28 +147,14 @@ if (empty($available_combinations)) {
                     <div class="row text-center">
                         <?php
                             $stats = get_statistics();
-                            $total_all_responses = 0;
-                            foreach ($questions as $q) {
-                                $total_all_responses += count(get_question_responses_by_year_semester($q['id'], $selected_year, $selected_semester));
-                            }
-                            ?>
-                        <div class="col-md-3">
+                        ?>
+                        <div class="col-md-6">
                             <h3 class="text-primary"><?php echo $stats['total_questions']; ?></h3>
                             <p class="text-muted">總問題數</p>
                         </div>
-                        <div class="col-md-3">
-                            <h3 class="text-success"><?php echo $total_all_responses; ?></h3>
-                            <p class="text-muted">總回答數</p>
-                        </div>
-                        <div class="col-md-3">
+                        <div class="col-md-6">
                             <h3 class="text-info"><?php echo $stats['total_respondents']; ?></h3>
                             <p class="text-muted">受訪者數</p>
-                        </div>
-                        <div class="col-md-3">
-                            <h3 class="text-warning">
-                                <?php echo $stats['total_questions'] > 0 ? round($total_all_responses / $stats['total_questions'], 1) : 0; ?>
-                            </h3>
-                            <p class="text-muted">平均回答率</p>
                         </div>
                     </div>
                 </div>

@@ -109,15 +109,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                                 <strong>選項</strong>
                                 <small class="text-muted">(每一行一個選項，最多100字)</small>
                             </label>
-                            <textarea class="form-control" id="options" name="options" rows="4" maxlength="1000">
+                            <textarea class="form-control" id="options" name="options" rows="4" maxlength="1000"><?php echo implode("\n", array_map('htmlspecialchars', $question['options'])); ?></textarea>
+                        </div>
+
                         <div class="mb-3">
                             <label for="description" class="form-label">
                                 <strong>問題描述</strong>
                                 <small class="text-muted">(最多500字)</small>
                             </label>
-                            <textarea class="form-control" id="description" name="description" rows="2" maxlength="500">
-<?php echo htmlspecialchars($question['description']); ?>
-</textarea>
+                            <textarea class="form-control" id="description" name="description" rows="2" maxlength="500"><?php echo htmlspecialchars($question['description']); ?></textarea>
                         </div>
 
                         <div class="mb-3">

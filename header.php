@@ -138,7 +138,8 @@
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="results.php">
+                        <a class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'results.php' ? 'active' : ''; ?>"
+                            href="results.php">
                             <i class="fas fa-chart-bar"></i> 查看結果
                         </a>
                     </li>

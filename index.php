@@ -87,7 +87,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_survey'])) {
             }
             
             if ($saved_count > 0) {
-                $message = "感謝您的填寫！已收到 $saved_count 份回應。";
+                $message = "感謝您的填寫!";
                 $message_type = 'success';
                 $selected_course = null;
             } else {

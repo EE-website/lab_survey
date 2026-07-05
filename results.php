@@ -6,20 +6,31 @@ $page_title = '結果統計';
 include 'db.php';
 include 'header.php';
 
-$questions = get_all_questions();
-
 // Get current academic settings
 $current_settings = get_current_academic_settings();
 
 // Get selected academic year and semester from GET parameters or use current
 $selected_year = isset($_GET['year']) ? intval($_GET['year']) : $current_settings['academic_year'];
 $selected_semester = isset($_GET['semester']) ? intval($_GET['semester']) : $current_settings['semester'];
+$selected_course = isset($_GET['course']) ? intval($_GET['course']) : 0;
 
 $available_combinations = get_all_academic_year_semester_combinations();
 
 // If no data available, add current settings as default
 if (empty($available_combinations)) {
     $available_combinations = [['academic_year' => $current_settings['academic_year'], 'semester' => $current_settings['semester']]];
+}
+
+// Get available courses for the selected semester
+$available_courses = get_courses_by_year_semester($selected_year, $selected_semester);
+
+// Get questions based on selected course
+if ($selected_course > 0) {
+    // Get questions for specific course
+    $questions = get_questions_by_course($selected_course);
+} else {
+    // Get all questions (for backward compatibility and overview)
+    $questions = get_all_questions();
 }
 ?>
 
@@ -28,7 +39,16 @@ if (empty($available_combinations)) {
         <i class="fas fa-chart-bar"></i> 結果統計
     </h1>
 
-    <!-- Academic Year and Semester Filter -->
+    <!-- Survey Status Alert -->
+    <div class="alert alert-<?php echo ($current_settings['status'] === 'open') ? 'success' : 'warning'; ?> mb-3">
+        <i class="fas fa-<?php echo ($current_settings['status'] === 'open') ? 'unlock' : 'lock'; ?>"></i>
+        <strong>問卷狀態：</strong>
+        <?php echo ($current_settings['status'] === 'open') ? '開放' : '已關閉'; ?>
+        (民國 <?php echo $current_settings['academic_year']; ?>
+        <?php echo get_semester_name($current_settings['semester']); ?>)
+    </div>
+
+    <!-- Academic Year, Semester and Course Filter -->
     <div class="card mb-4">
         <div class="card-body">
             <div class="row align-items-center">
@@ -39,7 +59,8 @@ if (empty($available_combinations)) {
                 </div>
                 <div class="col-md-9">
                     <form method="GET" class="d-flex gap-2">
-                        <select class="form-select" id="academic_year_filter" name="year" onchange="this.form.submit()">
+                        <select class="form-select" id="academic_year_filter" name="year" onchange="this.form.submit()"
+                            style="flex: 1;">
                             <?php foreach ($available_combinations as $combo): ?>
                             <option value="<?php echo $combo['academic_year']; ?>"
                                 data-semester="<?php echo $combo['semester']; ?>"
@@ -47,6 +68,16 @@ if (empty($available_combinations)) {
                                 民國 <?php echo $combo['academic_year']; ?>
                                 <?php echo get_semester_name($combo['semester']); ?> (西元
                                 <?php echo roc_to_western($combo['academic_year']); ?>)
+                            </option>
+                            <?php endforeach; ?>
+                        </select>
+                        <select class="form-select" id="course_filter" name="course" onchange="this.form.submit()"
+                            style="flex: 1;">
+                            <?php foreach ($available_courses as $course): ?>
+                            <option value="<?php echo $course['id']; ?>"
+                                <?php echo ($selected_course === intval($course['id'])) ? 'selected' : ''; ?>>
+                                [<?php echo htmlspecialchars($course['course_code']); ?>]
+                                <?php echo htmlspecialchars($course['course_name']); ?>
                             </option>
                             <?php endforeach; ?>
                         </select>
@@ -61,6 +92,10 @@ if (empty($available_combinations)) {
     <div class="alert alert-info" role="alert">
         <i class="fas fa-info-circle"></i>
         <strong>注意：</strong> 以下是民國 <?php echo $selected_year; ?> <?php echo get_semester_name($selected_semester); ?>
+        <?php if ($selected_course > 0): ?>
+        <!-- 課程：[<?php echo htmlspecialchars($available_courses[array_search($selected_course, array_column($available_courses, 'id'))]['course_code'] ?? ''); ?>] 
+        <?php echo htmlspecialchars($available_courses[array_search($selected_course, array_column($available_courses, 'id'))]['course_name'] ?? ''); ?> -->
+        <?php endif; ?>
         的問卷回應統計結果。
     </div>
 
@@ -73,6 +108,42 @@ if (empty($available_combinations)) {
         <?php foreach ($questions as $question): ?>
         <?php 
                 $responses = get_question_responses_by_year_semester($question['id'], $selected_year, $selected_semester);
+                
+                // Filter responses by selected course if specified
+                if ($selected_course > 0) {
+                    $responses = array_filter($responses, function($response) use ($selected_course) {
+                        // Check if response has course_id match
+                        // Since we need to query the database for course_id, we'll do it in the response
+                        return true; // Placeholder - filtering should be done at database level
+                    });
+                    
+                    // For now, filter by getting only questions from this course
+                    // and checking responses belong to this course
+                    $sql_filter = "SELECT id FROM responses WHERE question_id = ? AND course_id = ? AND academic_year = ? AND semester = ?";
+                    $stmt = $GLOBALS['conn']->prepare($sql_filter);
+                    if ($stmt) {
+                        $stmt->bind_param("iiii", $question['id'], $selected_course, $selected_year, $selected_semester);
+                        $stmt->execute();
+                        $result = $stmt->get_result();
+                        $filtered_responses = [];
+                        while ($row = $result->fetch_assoc()) {
+                            $filtered_responses[] = $row['id'];
+                        }
+                        // Re-fetch filtered responses with proper data
+                        $sql_full = "SELECT id, question_id, answer, respondent, academic_year, semester, created_at FROM responses WHERE question_id = ? AND course_id = ? AND academic_year = ? AND semester = ? ORDER BY created_at DESC";
+                        $stmt2 = $GLOBALS['conn']->prepare($sql_full);
+                        if ($stmt2) {
+                            $stmt2->bind_param("iiii", $question['id'], $selected_course, $selected_year, $selected_semester);
+                            $stmt2->execute();
+                            $result2 = $stmt2->get_result();
+                            $responses = [];
+                            while ($row = $result2->fetch_assoc()) {
+                                $responses[] = $row;
+                            }
+                        }
+                    }
+                }
+                
                 $total_responses = count($responses);
                 $stats = calculate_question_statistics($question['id'], $responses, $question['type'], $question['allow_multiple']);
                 ?>

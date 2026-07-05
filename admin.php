@@ -220,7 +220,9 @@ $all_questions = get_all_questions(); // For course question selection
                             <div>
                                 <div class="form-check">
                                     <input class="form-check-input" type="radio" name="survey_status" id="survey_open"
-                                        value="open" <?php echo ($current_settings['status'] === 'open') ? 'checked' : ''; ?> required>
+                                        value="open"
+                                        <?php echo ($current_settings['status'] === 'open') ? 'checked' : ''; ?>
+                                        required>
                                     <label class="form-check-label" for="survey_open">
                                         <i class="fas fa-unlock text-success"></i> <strong>開放</strong>
                                         <small class="text-muted">(學生可填寫問卷)</small>
@@ -228,7 +230,9 @@ $all_questions = get_all_questions(); // For course question selection
                                 </div>
                                 <div class="form-check">
                                     <input class="form-check-input" type="radio" name="survey_status" id="survey_closed"
-                                        value="closed" <?php echo ($current_settings['status'] === 'closed') ? 'checked' : ''; ?> required>
+                                        value="closed"
+                                        <?php echo ($current_settings['status'] === 'closed') ? 'checked' : ''; ?>
+                                        required>
                                     <label class="form-check-label" for="survey_closed">
                                         <i class="fas fa-lock text-danger"></i> <strong>關閉</strong>
                                         <small class="text-muted">(隱藏問卷表單，只能查看統計)</small>
@@ -298,13 +302,16 @@ $all_questions = get_all_questions(); // For course question selection
                                     <strong>選擇問題</strong>
                                     <small class="text-muted">(可複選，可不選)</small>
                                 </label>
-                                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="toggleSelectAll('add')">全選</button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary"
+                                    onclick="toggleSelectAll('add')">全選</button>
                             </div>
-                            <div class="border rounded p-3" style="max-height: 200px; overflow-y: auto; background-color: #f8f9fa;" id="add-questions-container">
+                            <div class="border rounded p-3"
+                                style="max-height: 200px; overflow-y: auto; background-color: #f8f9fa;"
+                                id="add-questions-container">
                                 <?php if (count($all_questions) > 0): ?>
                                 <?php foreach ($all_questions as $q): ?>
                                 <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" name="course_questions[]" 
+                                    <input class="form-check-input" type="checkbox" name="course_questions[]"
                                         id="cq_add_<?php echo $q['id']; ?>" value="<?php echo $q['id']; ?>">
                                     <label class="form-check-label" for="cq_add_<?php echo $q['id']; ?>">
                                         <small><?php echo htmlspecialchars($q['title']); ?></small>
@@ -332,8 +339,8 @@ $all_questions = get_all_questions(); // For course question selection
             <div class="card mb-4">
                 <div class="card-header">
                     <i class="fas fa-book-open"></i> 課程列表 (<?php echo count($courses); ?>)
-                    <small class="text-muted">民國 <?php echo $current_settings['academic_year']; ?> 
-                    <?php echo get_semester_name($current_settings['semester']); ?></small>
+                    <small class="text-muted">民國 <?php echo $current_settings['academic_year']; ?>
+                        <?php echo get_semester_name($current_settings['semester']); ?></small>
                 </div>
                 <div class="card-body" style="max-height: 600px; overflow-y: auto;">
                     <?php if (count($courses) > 0): ?>
@@ -341,7 +348,7 @@ $all_questions = get_all_questions(); // For course question selection
                     <div class="card mb-2 border-left border-success" style="border-left-width: 4px;">
                         <div class="card-body p-2">
                             <h6 class="card-title mb-1">
-                                <strong><?php echo htmlspecialchars($course['course_code']); ?></strong> - 
+                                <strong><?php echo htmlspecialchars($course['course_code']); ?></strong> -
                                 <?php echo htmlspecialchars($course['course_name']); ?>
                             </h6>
                             <small class="text-muted d-block">
@@ -354,7 +361,8 @@ $all_questions = get_all_questions(); // For course question selection
                             <?php endif; ?>
                             <div class="mt-2 d-flex gap-2">
                                 <button type="button" class="btn btn-sm btn-warning" data-bs-toggle="modal"
-                                    data-bs-target="#editCourseModal" onclick="editCourse(<?php echo $course['id']; ?>, '<?php echo htmlspecialchars($course['course_code'], ENT_QUOTES); ?>', '<?php echo htmlspecialchars($course['course_name'], ENT_QUOTES); ?>', '<?php echo htmlspecialchars($course['instructor_name'], ENT_QUOTES); ?>', '<?php echo htmlspecialchars($course['description'] ?? '', ENT_QUOTES); ?>')">
+                                    data-bs-target="#editCourseModal"
+                                    onclick="editCourse(<?php echo $course['id']; ?>, '<?php echo htmlspecialchars($course['course_code'], ENT_QUOTES); ?>', '<?php echo htmlspecialchars($course['course_name'], ENT_QUOTES); ?>', '<?php echo htmlspecialchars($course['instructor_name'], ENT_QUOTES); ?>', '<?php echo htmlspecialchars($course['description'] ?? '', ENT_QUOTES); ?>')">
                                     <i class="fas fa-edit"></i> 編輯
                                 </button>
                                 <form method="POST" action="" style="display: inline;"
@@ -432,14 +440,18 @@ $all_questions = get_all_questions(); // For course question selection
                                     <strong>選擇問題</strong>
                                     <small class="text-muted">(可複選，可不選)</small>
                                 </label>
-                                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="toggleSelectAll('edit')">全選</button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary"
+                                    onclick="toggleSelectAll('edit')">全選</button>
                             </div>
-                            <div class="border rounded p-3" style="max-height: 200px; overflow-y: auto; background-color: #f8f9fa;" id="edit-questions-container">
+                            <div class="border rounded p-3"
+                                style="max-height: 200px; overflow-y: auto; background-color: #f8f9fa;"
+                                id="edit-questions-container">
                                 <?php if (count($all_questions) > 0): ?>
                                 <?php foreach ($all_questions as $q): ?>
                                 <div class="form-check">
-                                    <input class="form-check-input edit-course-question" type="checkbox" name="course_questions[]" 
-                                        id="cq_edit_<?php echo $q['id']; ?>" value="<?php echo $q['id']; ?>">
+                                    <input class="form-check-input edit-course-question" type="checkbox"
+                                        name="course_questions[]" id="cq_edit_<?php echo $q['id']; ?>"
+                                        value="<?php echo $q['id']; ?>">
                                     <label class="form-check-label" for="cq_edit_<?php echo $q['id']; ?>">
                                         <small><?php echo htmlspecialchars($q['title']); ?></small>
                                     </label>
@@ -517,14 +529,16 @@ $all_questions = get_all_questions(); // For course question selection
 
                         <div class="mb-3">
                             <div class="form-check mb-2">
-                                <input class="form-check-input" type="checkbox" id="allow_multiple" name="allow_multiple">
+                                <input class="form-check-input" type="checkbox" id="allow_multiple"
+                                    name="allow_multiple">
                                 <label class="form-check-label" for="allow_multiple">
                                     <strong>多選題允許複選</strong>
                                     <small class="text-muted">(只有選擇「多選題」時有效)</small>
                                 </label>
                             </div>
                             <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="is_required" name="is_required" checked>
+                                <input class="form-check-input" type="checkbox" id="is_required" name="is_required"
+                                    checked>
                                 <label class="form-check-label" for="is_required">
                                     <strong>必填</strong>
                                     <small class="text-muted">(預設必填)</small>
@@ -622,10 +636,10 @@ function toggleSelectAll(form) {
     const container = form === 'add' ? 'add-questions-container' : 'edit-questions-container';
     const checkboxClass = form === 'add' ? 'form-check-input' : 'edit-course-question';
     const checkboxes = document.querySelectorAll('#' + container + ' .' + checkboxClass);
-    
+
     // Check if all are already selected
     const allChecked = Array.from(checkboxes).every(cb => cb.checked);
-    
+
     // Toggle: if all checked, uncheck all; otherwise check all
     checkboxes.forEach(checkbox => {
         checkbox.checked = !allChecked;
@@ -639,12 +653,12 @@ function editCourse(id, courseCode, courseName, instructorName, description) {
     document.getElementById('edit_course_name').value = courseName;
     document.getElementById('edit_instructor_name').value = instructorName;
     document.getElementById('edit_course_description').value = description;
-    
+
     // Clear all question checkboxes first
     document.querySelectorAll('.edit-course-question').forEach(checkbox => {
         checkbox.checked = false;
     });
-    
+
     // Load course's questions via AJAX
     fetch('get_course_questions.php?course_id=' + id)
         .then(response => response.json())

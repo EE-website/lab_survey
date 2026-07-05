@@ -79,7 +79,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_survey'])) {
                 $stmt = $conn->prepare($sql);
                 
                 if ($stmt) {
-                    $stmt->bind_param("iiiiissss", $question_id, $course_id, $academic_year, $semester, $answer, $respondent_name, $student_id_clean, $ip_address, $user_agent);
+                    $stmt->bind_param("iiiisssss", $question_id, $course_id, $academic_year, $semester, $answer, $respondent_name, $student_id_clean, $ip_address, $user_agent);
                     if ($stmt->execute()) {
                         $saved_count++;
                     }
@@ -128,7 +128,7 @@ $questions = ($selected_course) ? get_questions_by_course($selected_course['id']
     <?php if ($survey_is_open && (!$selected_course || count($available_courses) === 0)): ?>
     <div class="card mb-4">
         <div class="card-header bg-primary text-white">
-            <i class="fas fa-graduation-cap"></i> 第一步：選擇課程
+            <i class="fas fa-graduation-cap"></i> 選擇課程
         </div>
         <div class="card-body">
             <?php if (count($available_courses) === 0): ?>
